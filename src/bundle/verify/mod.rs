@@ -17,7 +17,10 @@
 
 mod models;
 
-pub use models::{VerificationError, VerificationResult};
+pub use models::{
+    BundleErrorKind, CertificateErrorKind, CheckedBundle, SignatureErrorKind, VerificationError,
+    VerificationResult,
+};
 
 pub mod policy;
 pub use policy::{PolicyError, VerificationPolicy};
