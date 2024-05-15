@@ -136,7 +136,8 @@ pub enum VerificationError {
 pub type VerificationResult = Result<(), VerificationError>;
 
 pub struct CheckedBundle {
-    pub(crate) certificate: Certificate,
+    pub certificate: Certificate,
+    pub intermediate_certificates: Vec<Certificate>,
     pub(crate) signature: Vec<u8>,
 
     tlog_entry: TransparencyLogEntry,
@@ -242,6 +243,7 @@ impl TryFrom<Bundle> for CheckedBundle {
 
         Ok(Self {
             certificate: leaf_cert.clone(),
+            intermediate_certificates: chain_certs.to_vec(),
             signature,
             tlog_entry,
         })
