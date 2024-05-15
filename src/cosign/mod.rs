@@ -48,7 +48,6 @@ use crate::crypto::{CosignVerificationKey, Signature};
 use crate::errors::SigstoreError;
 use base64::{engine::general_purpose::STANDARD as BASE64_STD_ENGINE, Engine as _};
 use pkcs8::der::Decode;
-use std::convert::TryFrom;
 use x509_cert::Certificate;
 
 pub mod bundle;
@@ -284,7 +283,6 @@ where
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use std::collections::HashMap;
     use webpki::types::CertificateDer;
 
     use super::constraint::{AnnotationMarker, PrivateKeySigner};
@@ -296,7 +294,7 @@ mod tests {
         AnnotationVerifier, CertSubjectEmailVerifier, VerificationConstraintVec,
     };
     use crate::crypto::certificate_pool::CertificatePool;
-    use crate::crypto::{CosignVerificationKey, SigningScheme};
+    use crate::crypto::SigningScheme;
 
     #[cfg(feature = "test-registry")]
     use testcontainers::{clients, core::WaitFor};
@@ -337,7 +335,7 @@ TNMea7Ix/stJ5TfcLLeABLE4BNJOsQ4vnBHJ
     #[cfg(feature = "test-registry")]
     const SIGNED_IMAGE: &str = "busybox:1.34";
 
-    pub(crate) fn get_fulcio_cert_pool() -> CertificatePool<'static> {
+    pub(crate) fn get_fulcio_cert_pool() -> CertificatePool {
         fn pem_to_der<'a>(input: &'a str) -> CertificateDer<'a> {
             let pem_cert = pem::parse(input).unwrap();
             assert_eq!(pem_cert.tag(), "CERTIFICATE");
@@ -644,7 +642,7 @@ TNMea7Ix/stJ5TfcLLeABLE4BNJOsQ4vnBHJ
     }
 
     #[cfg(feature = "test-registry")]
-    async fn prepare_image_to_be_signed(client: &mut Client<'_>, image_ref: &OciReference) {
+    async fn prepare_image_to_be_signed(client: &mut Client, image_ref: &OciReference) {
         let data = client
             .registry_client
             .pull(

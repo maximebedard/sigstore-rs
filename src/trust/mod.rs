@@ -22,6 +22,7 @@ pub mod sigstore;
 pub trait TrustRoot {
     fn fulcio_certs(&self) -> crate::errors::Result<Vec<CertificateDer>>;
     fn rekor_keys(&self) -> crate::errors::Result<Vec<&[u8]>>;
+    fn ctfe_keys(&self) -> crate::errors::Result<Vec<&[u8]>>;
 }
 
 /// A `ManualTrustRoot` is a [TrustRoot] with out-of-band trust materials.
@@ -30,6 +31,7 @@ pub trait TrustRoot {
 pub struct ManualTrustRoot<'a> {
     pub fulcio_certs: Option<Vec<CertificateDer<'a>>>,
     pub rekor_key: Option<Vec<u8>>,
+    pub ctfe_keys: Vec<Vec<u8>>,
 }
 
 impl TrustRoot for ManualTrustRoot<'_> {
@@ -45,5 +47,9 @@ impl TrustRoot for ManualTrustRoot<'_> {
             Some(key) => vec![&key[..]],
             None => Vec::new(),
         })
+    }
+
+    fn ctfe_keys(&self) -> crate::errors::Result<Vec<&[u8]>> {
+        Ok(self.ctfe_keys.iter().map(|v| &v[..]).collect())
     }
 }

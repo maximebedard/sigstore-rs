@@ -143,7 +143,8 @@ pub enum SigstoreError {
     #[error(transparent)]
     JoinError(#[from] tokio::task::JoinError),
 
-    #[cfg(feature = "sign")]
+    // HACK(tnytown): Remove when we rework the Fulcio V2 endpoint.
+    #[cfg(feature = "fulcio")]
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
 

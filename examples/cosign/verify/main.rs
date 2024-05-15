@@ -23,8 +23,6 @@ use sigstore::crypto::SigningScheme;
 use sigstore::errors::SigstoreVerifyConstraintsError;
 use sigstore::registry::{ClientConfig, ClientProtocol, OciReference};
 use sigstore::trust::sigstore::SigstoreTrustRoot;
-use std::boxed::Box;
-use std::convert::TryFrom;
 use std::time::Instant;
 
 extern crate anyhow;
@@ -34,7 +32,6 @@ extern crate clap;
 use clap::Parser;
 
 use std::{collections::HashMap, fs};
-use tokio::task::spawn_blocking;
 
 extern crate tracing_subscriber;
 use tracing::{info, warn};
@@ -230,12 +227,9 @@ async fn run_app(
 
 async fn fulcio_and_rekor_data(cli: &Cli) -> anyhow::Result<Box<dyn sigstore::trust::TrustRoot>> {
     if cli.use_sigstore_tuf_data {
-        let repo: sigstore::errors::Result<SigstoreTrustRoot> = spawn_blocking(|| {
-            info!("Downloading data from Sigstore TUF repository");
-            SigstoreTrustRoot::new(None)?.prefetch()
-        })
-        .await
-        .map_err(|e| anyhow!("Error spawning blocking task inside of tokio: {}", e))?;
+        info!("Downloading data from Sigstore TUF repository");
+
+        let repo: sigstore::errors::Result<SigstoreTrustRoot> = SigstoreTrustRoot::new(None).await;
 
         return Ok(Box::new(repo?));
     };
