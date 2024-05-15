@@ -145,6 +145,8 @@ tempfile = "3.3.0"
 testcontainers = "0.15"
 tokio = { version = "1.17.0", features = ["rt", "rt-multi-thread"] }
 tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
+hex = "0.4.3"
+hex-literal = "0.4"
 
 # cosign example mappings
 
@@ -221,3 +223,11 @@ path = "examples/rekor/search_log_query/main.rs"
 [[example]]
 name = "fulcio_cert"
 path = "examples/fulcio/cert/main.rs"
+
+[[example]]
+name = "inclusion_proof"
+path = "examples/rekor/merkle_proofs/inclusion.rs"
+
+[[example]]
+name = "consistency_proof"
+path = "examples/rekor/merkle_proofs/consistency.rs"

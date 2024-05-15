@@ -18,6 +18,7 @@ use std::str::FromStr;
 use crate::{
     bundle::{models::Version as BundleVersion, Bundle},
     crypto::certificate::{is_leaf, is_root_ca, CertificateValidationError},
+    errors::SigstoreError,
     rekor::models as rekor,
 };
 
@@ -289,5 +290,27 @@ impl CheckedBundle {
         }
 
         Some(entry)
+    }
+
+    pub fn verify_inclusion(
+        &self,
+        tlog_entry: &TransparencyLogEntry,
+        rekor_key: &crate::crypto::CosignVerificationKey,
+    ) -> Result<(), SigstoreError> {
+        let inclusion_proof =
+            tlog_entry
+                .inclusion_proof
+                .clone()
+                .ok_or(SigstoreError::UnexpectedError(
+                    "no inclusion proof".to_string(),
+                ))?;
+
+        let proof =
+            crate::rekor::models::InclusionProof::try_from(inclusion_proof).map_err(|_| {
+                SigstoreError::UnexpectedError("failed to parse inclusion proof".to_string())
+            })?;
+
+        let body = &tlog_entry.canonicalized_body;
+        proof.verify(body, rekor_key)
     }
 }

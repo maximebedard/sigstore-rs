@@ -10,7 +10,8 @@ use sigstore_protobuf_specs::dev::sigstore::{
 };
 
 use crate::rekor::models::{
-    log_entry::InclusionProof as RekorInclusionProof, LogEntry as RekorLogEntry,
+    checkpoint::Checkpoint as RekorCheckpoint, log_entry::InclusionProof as LogEntryInclusionProof,
+    InclusionProof as RekorInclusionProof, LogEntry as RekorLogEntry,
 };
 
 // Known Sigstore bundle media types.
@@ -46,10 +47,40 @@ fn decode_hex<S: AsRef<str>>(hex: S) -> Result<Vec<u8>, ()> {
     hex::decode(hex.as_ref()).or(Err(()))
 }
 
-impl TryFrom<RekorInclusionProof> for InclusionProof {
+#[inline]
+fn encode_hex<S: AsRef<Vec<u8>>>(hex: S) -> Result<String, ()> {
+    Ok(hex::encode(hex.as_ref()))
+}
+
+impl TryFrom<InclusionProof> for RekorInclusionProof {
     type Error = ();
 
-    fn try_from(value: RekorInclusionProof) -> Result<Self, Self::Error> {
+    fn try_from(value: InclusionProof) -> Result<Self, Self::Error> {
+        let hashes = value
+            .hashes
+            .iter()
+            .map(encode_hex)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let checkpoint = match value.checkpoint {
+            Some(c) => RekorCheckpoint::from_str(&c.envelope).ok(),
+            None => None,
+        };
+
+        Ok(RekorInclusionProof {
+            checkpoint,
+            hashes,
+            log_index: value.log_index,
+            root_hash: encode_hex(value.root_hash)?,
+            tree_size: value.tree_size,
+        })
+    }
+}
+
+impl TryFrom<LogEntryInclusionProof> for InclusionProof {
+    type Error = ();
+
+    fn try_from(value: LogEntryInclusionProof) -> Result<Self, Self::Error> {
         let hashes = value
             .hashes
             .iter()

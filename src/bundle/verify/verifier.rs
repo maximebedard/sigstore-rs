@@ -24,7 +24,7 @@ use x509_cert::der::Encode;
 
 use crate::{
     bundle::Bundle,
-    crypto::{CertificatePool, CosignVerificationKey, Signature},
+    crypto::{CertificatePool, CosignVerificationKey, Signature, SigningScheme},
     errors::Result as SigstoreResult,
     rekor::apis::configuration::Configuration as RekorConfiguration,
     trust::TrustRoot,
@@ -45,6 +45,7 @@ use super::{
 pub struct Verifier<'a> {
     #[allow(dead_code)]
     rekor_config: RekorConfiguration,
+    rekor_key: CosignVerificationKey,
     cert_pool: CertificatePool<'a>,
 }
 
@@ -57,9 +58,13 @@ impl<'a> Verifier<'a> {
         trust_repo: R,
     ) -> SigstoreResult<Self> {
         let cert_pool = CertificatePool::from_certificates(trust_repo.fulcio_certs()?, [])?;
+        let rekor_key_bytes = trust_repo.rekor_keys().unwrap()[0];
+        let rekor_key =
+            CosignVerificationKey::from_pem(rekor_key_bytes, &SigningScheme::default()).unwrap();
 
         Ok(Self {
             rekor_config,
+            rekor_key,
             cert_pool,
         })
     }
@@ -162,7 +167,10 @@ impl<'a> Verifier<'a> {
 
         // 5) Verify the inclusion proof supplied by Rekor for this artifact,
         //    if we're doing online verification.
-        // TODO(tnytown): Merkle inclusion; sigstore-rs#285
+        materials
+            .verify_inclusion(log_entry, &self.rekor_key)
+            .map_err(SignatureErrorKind::VerificationFailed)?;
+
 
         // 6) Verify the Signed Entry Timestamp (SET) supplied by Rekor for this
         //    artifact.
