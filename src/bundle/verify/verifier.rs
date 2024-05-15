@@ -42,13 +42,13 @@ use super::{
 /// An asynchronous Sigstore verifier.
 ///
 /// For synchronous usage, see [`Verifier`].
-pub struct Verifier {
+pub struct Verifier<'a> {
     #[allow(dead_code)]
     rekor_config: RekorConfiguration,
-    cert_pool: CertificatePool,
+    cert_pool: CertificatePool<'a>,
 }
 
-impl Verifier {
+impl<'a> Verifier<'a> {
     /// Constructs a [`Verifier`].
     ///
     /// For verifications against the public-good trust root, use [`Verifier::production()`].
@@ -72,6 +72,8 @@ impl Verifier {
         bundle: Bundle,
         policy: &P,
         offline: bool,
+        verification_time: Option<UnixTime>,
+        revocation: Option<webpki::RevocationOptions<'a>>,
     ) -> VerificationResult
     where
         P: VerificationPolicy,
@@ -106,13 +108,30 @@ impl Verifier {
             .to_der()
             .expect("failed to DER-encode constructed Certificate!")
             .into();
+        let intermediate_der = &materials
+            .intermediate_certificates
+            .iter()
+            .map(|cert| {
+                cert.to_der()
+                    .expect("failed to DER-encode constructed Certificate!")
+            })
+            .collect::<Vec<Vec<u8>>>();
+        let ints = intermediate_der
+            .iter()
+            .map(|cert| CertificateDer::from(cert.to_owned()))
+            .collect::<Vec<CertificateDer>>();
         let ee_cert = (&cert_der)
             .try_into()
             .map_err(CertificateErrorKind::Malformed)?;
 
+        let verification_time = match verification_time {
+            Some(v) => v,
+            None => UnixTime::since_unix_epoch(issued_at),
+        };
+
         let _trusted_chain = self
             .cert_pool
-            .verify_cert_with_time(&ee_cert, UnixTime::since_unix_epoch(issued_at))
+            .custom_verify_cert_with_time(&ee_cert, &ints, verification_time, revocation)
             .map_err(CertificateErrorKind::VerificationFailed)?;
 
         debug!("signing certificate chains back to trusted root");
@@ -179,6 +198,8 @@ impl Verifier {
         bundle: Bundle,
         policy: &P,
         offline: bool,
+        verification_time: Option<UnixTime>,
+        revocation: Option<webpki::RevocationOptions<'a>>,
     ) -> VerificationResult
     where
         R: AsyncRead + Unpin + Send,
@@ -199,14 +220,22 @@ impl Verifier {
             }
         }
 
-        self.verify_digest(hasher, bundle, policy, offline).await
+        self.verify_digest(
+            hasher,
+            bundle,
+            policy,
+            offline,
+            verification_time,
+            revocation,
+        )
+        .await
     }
 }
 
-impl Verifier {
+impl<'a> Verifier<'a> {
     /// Constructs an [`Verifier`] against the public-good trust root.
     #[cfg(feature = "sigstore-trust-root")]
-    pub async fn production() -> SigstoreResult<Verifier> {
+    pub async fn production() -> SigstoreResult<Verifier<'static>> {
         let updater = SigstoreTrustRoot::new(None).await?;
 
         Verifier::new(Default::default(), updater)
@@ -217,12 +246,12 @@ pub mod blocking {
     use super::{Verifier as AsyncVerifier, *};
 
     /// A synchronous Sigstore verifier.
-    pub struct Verifier {
-        inner: AsyncVerifier,
+    pub struct Verifier<'a> {
+        inner: AsyncVerifier<'a>,
         rt: tokio::runtime::Runtime,
     }
 
-    impl Verifier {
+    impl<'a> Verifier<'a> {
         /// Constructs a synchronous Sigstore verifier.
         ///
         /// For verifications against the public-good trust root, use [`Verifier::production()`].
@@ -250,10 +279,14 @@ pub mod blocking {
         where
             P: VerificationPolicy,
         {
-            self.rt.block_on(
-                self.inner
-                    .verify_digest(input_digest, bundle, policy, offline),
-            )
+            self.rt.block_on(self.inner.verify_digest(
+                input_digest,
+                bundle,
+                policy,
+                offline,
+                None,
+                None,
+            ))
         }
 
         /// Verifies an input against the given Sigstore Bundle, ensuring conformance to the provided
@@ -276,10 +309,10 @@ pub mod blocking {
         }
     }
 
-    impl Verifier {
+    impl<'a> Verifier<'a> {
         /// Constructs a synchronous [`Verifier`] against the public-good trust root.
         #[cfg(feature = "sigstore-trust-root")]
-        pub fn production() -> SigstoreResult<Verifier> {
+        pub fn production() -> SigstoreResult<Verifier<'a>> {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()?;

@@ -23,17 +23,17 @@ use crate::errors::{Result as SigstoreResult, SigstoreError};
 
 /// A collection of trusted root certificates.
 #[derive(Default, Debug)]
-pub(crate) struct CertificatePool {
-    trusted_roots: Vec<TrustAnchor<'static>>,
-    intermediates: Vec<CertificateDer<'static>>,
+pub(crate) struct CertificatePool<'a> {
+    trusted_roots: Vec<TrustAnchor<'a>>,
+    intermediates: Vec<CertificateDer<'a>>,
 }
 
-impl CertificatePool {
+impl<'a> CertificatePool<'a> {
     /// Builds a `CertificatePool` instance using the provided list of [`Certificate`].
     pub(crate) fn from_certificates<'r, 'i, R, I>(
         trusted_roots: R,
         untrusted_intermediates: I,
-    ) -> SigstoreResult<CertificatePool>
+    ) -> SigstoreResult<CertificatePool<'a>>
     where
         R: IntoIterator<Item = CertificateDer<'r>>,
         I: IntoIterator<Item = CertificateDer<'i>>,
@@ -98,7 +98,7 @@ impl CertificatePool {
         Ok(())
     }
 
-    pub(crate) fn verify_cert_with_time<'a, 'cert>(
+    pub(crate) fn verify_cert_with_time<'cert>(
         &'a self,
         cert: &'cert EndEntityCert<'cert>,
         verification_time: UnixTime,
@@ -116,6 +116,30 @@ impl CertificatePool {
             verification_time,
             KeyUsage::required(eku_code_signing),
             None,
+            None,
+        )
+    }
+
+    pub(crate) fn custom_verify_cert_with_time<'cert>(
+        &'a self,
+        cert: &'cert EndEntityCert<'cert>,
+        intermediates: &'cert Vec<CertificateDer<'_>>,
+        verification_time: UnixTime,
+        revocation: Option<webpki::RevocationOptions<'_>>,
+    ) -> Result<VerifiedPath<'cert>, webpki::Error>
+    where
+        'a: 'cert,
+    {
+        let signing_algs = webpki::ALL_VERIFICATION_ALGS;
+        let eku_code_signing = ID_KP_CODE_SIGNING.as_bytes();
+
+        cert.verify_for_usage(
+            signing_algs,
+            &self.trusted_roots,
+            &intermediates,
+            verification_time,
+            KeyUsage::required_if_present(eku_code_signing),
+            revocation,
             None,
         )
     }

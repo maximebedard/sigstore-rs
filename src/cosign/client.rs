@@ -40,7 +40,7 @@ pub const CONFIG_DATA: &str = "{}";
 pub struct Client {
     pub(crate) registry_client: Box<dyn crate::registry::ClientCapabilities>,
     pub(crate) rekor_pub_key: Option<CosignVerificationKey>,
-    pub(crate) fulcio_cert_pool: Option<CertificatePool>,
+    pub(crate) fulcio_cert_pool: Option<CertificatePool<'static>>,
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
