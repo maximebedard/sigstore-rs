@@ -126,7 +126,7 @@ url = "2.2.2"
 x509-cert = { version = "0.2.5", features = ["builder", "pem", "std", "sct"] }
 crypto_secretbox = "0.1.1"
 zeroize = "1.5.7"
-rustls-webpki = { version = "0.102.1", features = ["alloc"] }
+rustls-webpki = { version = "0.102", features = ["alloc"] }
 serde_repr = "0.1.16"
 hex = "0.4.3"
 json-syntax = { version = "0.12.2", features = ["canonicalize", "serde"] }
