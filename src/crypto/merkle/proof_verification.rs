@@ -208,7 +208,7 @@ where
     }
 
     fn inner_proof_size(index: usize, tree_size: usize) -> usize {
-        u64::BITS as usize - ((index ^ (tree_size - 1)).leading_zeros() as usize)
+        usize::BITS as usize - ((index ^ (tree_size - 1)).leading_zeros() as usize)
     }
 }
 
