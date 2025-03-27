@@ -81,15 +81,14 @@
 //! This of course has a performance hit when used inside of an async function.
 
 use crate::errors::{Result, SigstoreError};
-use tracing::error;
 
 use openidconnect::core::{
     CoreAuthenticationFlow, CoreClient, CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier,
-    CoreProviderMetadata, CoreResponseType, CoreTokenResponse,
+    CoreProviderMetadata, CoreTokenResponse,
 };
 use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet,
-    EndpointSet, IssuerUrl, Nonce, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope,
+    AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, PkceCodeChallenge,
+    PkceCodeVerifier, RedirectUrl, Scope,
 };
 
 use std::io::{BufRead, BufReader, Write};
@@ -176,7 +175,7 @@ impl OpenIDAuthorize {
 
         let provider_metadata =
             CoreProviderMetadata::discover(&issuer, &http_client).map_err(|err| {
-                error!("Error is: {:?}", err);
+                tracing::error!("Error is: {:?}", err);
                 SigstoreError::ClaimsVerificationError
             })?;
 
@@ -184,10 +183,13 @@ impl OpenIDAuthorize {
     }
 
     pub async fn auth_url_async(&self) -> Result<(Url, OpenIdClient, Nonce, PkceCodeVerifier)> {
-        let async_http_client = reqwest::ClientBuilder::new()
-            // Following redirects opens the client up to SSRF vulnerabilities.
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?;
+        let async_http_client = reqwest::ClientBuilder::new();
+
+        #[cfg(not(target_arch = "wasm32"))]
+        // Following redirects opens the client up to SSRF vulnerabilities. It is however not supported in WASM.
+        let async_http_client = async_http_client.redirect(reqwest::redirect::Policy::none());
+
+        let async_http_client = async_http_client.build()?;
 
         let issuer = IssuerUrl::new(self.oidc_issuer.to_owned()).expect("Missing the OIDC_ISSUER.");
 
@@ -289,9 +291,7 @@ impl RedirectListener {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn redirect_listener(self) -> Result<(CoreIdTokenClaims, CoreIdToken)> {
-        use openidconnect::reqwest::blocking::ClientBuilder;
-
-        let http_client = ClientBuilder::new()
+        let http_client = reqwest::blocking::ClientBuilder::new()
             // Following redirects opens the client up to SSRF vulnerabilities.
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
@@ -313,12 +313,13 @@ impl RedirectListener {
     }
 
     pub async fn redirect_listener_async(self) -> Result<(CoreIdTokenClaims, CoreIdToken)> {
-        use openidconnect::reqwest::ClientBuilder;
+        let async_http_client = reqwest::ClientBuilder::new();
 
-        let async_http_client = ClientBuilder::new()
-            // Following redirects opens the client up to SSRF vulnerabilities.
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?;
+        #[cfg(not(target_arch = "wasm32"))]
+        // Following redirects opens the client up to SSRF vulnerabilities. It is however not supported in WASM.
+        let async_http_client = async_http_client.redirect(reqwest::redirect::Policy::none());
+
+        let async_http_client = async_http_client.build()?;
 
         let code = self.redirect_listener_internal()?;
 
