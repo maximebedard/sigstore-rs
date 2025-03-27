@@ -88,8 +88,9 @@ futures-util = { version = "0.3.30", optional = true }
 lazy_static = "1.4.0"
 oci-distribution = { version = "0.11", default-features = false, optional = true }
 olpc-cjson = { version = "0.1", optional = true }
-openidconnect = { version = "3.0", default-features = false, features = [
+openidconnect = { version = "4.0", default-features = false, features = [
   "reqwest",
+  "reqwest-blocking"
 ], optional = true }
 p256 = "0.13"
 p384 = "0.13"
