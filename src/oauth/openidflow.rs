@@ -84,21 +84,26 @@ use crate::errors::{Result, SigstoreError};
 use tracing::error;
 
 use openidconnect::core::{
-    CoreClient, CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier, CoreProviderMetadata,
-    CoreResponseType, CoreTokenResponse,
+    CoreAuthenticationFlow, CoreClient, CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier,
+    CoreProviderMetadata, CoreResponseType, CoreTokenResponse,
 };
-use openidconnect::reqwest::async_http_client;
 use openidconnect::{
-    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope,
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet,
+    EndpointSet, IssuerUrl, Nonce, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope,
 };
-
-#[cfg(not(target_arch = "wasm32"))]
-use openidconnect::reqwest::http_client;
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use url::Url;
+
+pub(crate) type OpenIdClient = openidconnect::core::CoreClient<
+    openidconnect::EndpointSet,      // HasAuthUrl
+    openidconnect::EndpointNotSet,   // HasDeviceAuthUrl
+    openidconnect::EndpointNotSet,   // HasIntrospectionUrl
+    openidconnect::EndpointNotSet,   // HasRevocationUrl
+    openidconnect::EndpointMaybeSet, // HasTokenUrl
+    openidconnect::EndpointMaybeSet, // HasUserInfoUrl
+>;
 
 #[derive(Debug)]
 pub struct OpenIDAuthorize {
@@ -136,7 +141,7 @@ impl OpenIDAuthorize {
     fn auth_url_internal(
         &self,
         provider_metadata: CoreProviderMetadata,
-    ) -> Result<(Url, CoreClient, Nonce, PkceCodeVerifier)> {
+    ) -> Result<(Url, OpenIdClient, Nonce, PkceCodeVerifier)> {
         let client_id = ClientId::new(self.oidc_cliend_id.to_owned());
         let client_secret = ClientSecret::new(self.oidc_client_secret.to_owned());
 
@@ -150,7 +155,7 @@ impl OpenIDAuthorize {
 
         let (authorize_url, _, nonce) = client
             .authorize_url(
-                AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
+                CoreAuthenticationFlow::AuthorizationCode,
                 CsrfToken::new_random,
                 Nonce::new_random,
             )
@@ -161,11 +166,16 @@ impl OpenIDAuthorize {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn auth_url(&self) -> Result<(Url, CoreClient, Nonce, PkceCodeVerifier)> {
+    pub fn auth_url(&self) -> Result<(Url, OpenIdClient, Nonce, PkceCodeVerifier)> {
+        let http_client = reqwest::blocking::ClientBuilder::new()
+            // Following redirects opens the client up to SSRF vulnerabilities.
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
+
         let issuer = IssuerUrl::new(self.oidc_issuer.to_owned()).expect("Missing the OIDC_ISSUER.");
 
         let provider_metadata =
-            CoreProviderMetadata::discover(&issuer, http_client).map_err(|err| {
+            CoreProviderMetadata::discover(&issuer, &http_client).map_err(|err| {
                 error!("Error is: {:?}", err);
                 SigstoreError::ClaimsVerificationError
             })?;
@@ -173,10 +183,15 @@ impl OpenIDAuthorize {
         self.auth_url_internal(provider_metadata)
     }
 
-    pub async fn auth_url_async(&self) -> Result<(Url, CoreClient, Nonce, PkceCodeVerifier)> {
+    pub async fn auth_url_async(&self) -> Result<(Url, OpenIdClient, Nonce, PkceCodeVerifier)> {
+        let async_http_client = reqwest::ClientBuilder::new()
+            // Following redirects opens the client up to SSRF vulnerabilities.
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
+
         let issuer = IssuerUrl::new(self.oidc_issuer.to_owned()).expect("Missing the OIDC_ISSUER.");
 
-        let provider_metadata = CoreProviderMetadata::discover_async(issuer, async_http_client)
+        let provider_metadata = CoreProviderMetadata::discover_async(issuer, &async_http_client)
             .await
             .map_err(|_| SigstoreError::ClaimsVerificationError)?;
 
@@ -186,7 +201,7 @@ impl OpenIDAuthorize {
 
 pub struct RedirectListener {
     client_redirect_host: String,
-    client: CoreClient,
+    client: OpenIdClient,
     nonce: Nonce,
     pkce_verifier: PkceCodeVerifier,
 }
@@ -197,7 +212,7 @@ impl RedirectListener {
     //! # Arguments
     //!
     //! * `client_redirect_host` - The client callback host IP:PORT
-    //! * `client` - CoreClient instance (returned from OpenIDAuthorize)
+    //! * `client` - OpenIdClient instance (returned from OpenIDAuthorize)
     //! * `nonce` - Nonce (returned from OpenIDAuthorize)
     //! * `pkce_verifier` - client redirect URL
     //! # Example
@@ -209,7 +224,7 @@ impl RedirectListener {
     //! ```
     pub fn new(
         client_redirect_host: &str,
-        client: CoreClient,
+        client: OpenIdClient,
         nonce: Nonce,
         pkce_verifier: PkceCodeVerifier,
     ) -> Self {
@@ -274,13 +289,20 @@ impl RedirectListener {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn redirect_listener(self) -> Result<(CoreIdTokenClaims, CoreIdToken)> {
+        use openidconnect::reqwest::blocking::ClientBuilder;
+
+        let http_client = ClientBuilder::new()
+            // Following redirects opens the client up to SSRF vulnerabilities.
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
+
         let code = self.redirect_listener_internal()?;
 
         let token_response = self
             .client
-            .exchange_code(code)
+            .exchange_code(code)?
             .set_pkce_verifier(self.pkce_verifier)
-            .request(http_client)
+            .request(&http_client)
             .map_err(|_| SigstoreError::ClaimsAccessPointError)?;
 
         Self::extract_token_and_claims(
@@ -291,13 +313,20 @@ impl RedirectListener {
     }
 
     pub async fn redirect_listener_async(self) -> Result<(CoreIdTokenClaims, CoreIdToken)> {
+        use openidconnect::reqwest::ClientBuilder;
+
+        let async_http_client = ClientBuilder::new()
+            // Following redirects opens the client up to SSRF vulnerabilities.
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
+
         let code = self.redirect_listener_internal()?;
 
         let token_response = self
             .client
-            .exchange_code(code)
+            .exchange_code(code)?
             .set_pkce_verifier(self.pkce_verifier)
-            .request_async(async_http_client)
+            .request_async(&async_http_client)
             .await
             .map_err(|_| SigstoreError::ClaimsAccessPointError)?;
 
