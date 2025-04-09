@@ -41,7 +41,7 @@ rekor-rustls-tls = ["reqwest/rustls-tls", "rekor"]
 rekor = ["reqwest"]
 
 sign = ["sigstore_protobuf_specs", "fulcio", "rekor", "cert"]
-verify = ["sigstore_protobuf_specs", "fulcio", "rekor", "cert"]
+verify = ["sigstore_protobuf_specs", "rekor", "cert"]
 bundle = ["sign", "verify"]
 
 sigstore-trust-root = ["sigstore_protobuf_specs", "futures-util", "tough", "regex", "tokio/sync"]
