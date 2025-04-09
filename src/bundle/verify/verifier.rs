@@ -26,7 +26,6 @@ use crate::{
     bundle::Bundle,
     crypto::{CertificatePool, CosignVerificationKey, Signature, SigningScheme},
     errors::Result as SigstoreResult,
-    rekor::apis::configuration::Configuration as RekorConfiguration,
     trust::TrustRoot,
 };
 
@@ -42,28 +41,25 @@ use super::{
 /// An asynchronous Sigstore verifier.
 ///
 /// For synchronous usage, see [`Verifier`].
-pub struct Verifier<'a> {
+pub struct Verifier<'a, T> {
     #[allow(dead_code)]
-    rekor_config: RekorConfiguration,
+    online_verifier: T,
     rekor_key: CosignVerificationKey,
     cert_pool: CertificatePool<'a>,
 }
 
-impl<'a> Verifier<'a> {
+impl<'a, T> Verifier<'a, T> {
     /// Constructs a [`Verifier`].
     ///
     /// For verifications against the public-good trust root, use [`Verifier::production()`].
-    pub fn new<R: TrustRoot>(
-        rekor_config: RekorConfiguration,
-        trust_repo: R,
-    ) -> SigstoreResult<Self> {
+    pub fn new<R: TrustRoot>(online_verifier: T, trust_repo: R) -> SigstoreResult<Self> {
         let cert_pool = CertificatePool::from_certificates(trust_repo.fulcio_certs()?, [])?;
         let rekor_key_bytes = trust_repo.rekor_keys().unwrap()[0];
         let rekor_key =
             CosignVerificationKey::from_pem(rekor_key_bytes, &SigningScheme::default()).unwrap();
 
         Ok(Self {
-            rekor_config,
+            online_verifier,
             rekor_key,
             cert_pool,
         })
@@ -171,7 +167,6 @@ impl<'a> Verifier<'a> {
             .verify_inclusion(log_entry, &self.rekor_key)
             .map_err(SignatureErrorKind::VerificationFailed)?;
 
-
         // 6) Verify the Signed Entry Timestamp (SET) supplied by Rekor for this
         //    artifact.
         // TODO(tnytown) SET verification; sigstore-rs#285
@@ -240,13 +235,13 @@ impl<'a> Verifier<'a> {
     }
 }
 
-impl<'a> Verifier<'a> {
+impl<'a> Verifier<'a, ()> {
     /// Constructs an [`Verifier`] against the public-good trust root.
     #[cfg(feature = "sigstore-trust-root")]
-    pub async fn production() -> SigstoreResult<Verifier<'static>> {
+    pub async fn production() -> SigstoreResult<Verifier<'static, ()>> {
         let updater = SigstoreTrustRoot::new(None).await?;
 
-        Verifier::new(Default::default(), updater)
+        Verifier::new((), updater)
     }
 }
 
@@ -254,23 +249,20 @@ pub mod blocking {
     use super::{Verifier as AsyncVerifier, *};
 
     /// A synchronous Sigstore verifier.
-    pub struct Verifier<'a> {
-        inner: AsyncVerifier<'a>,
+    pub struct Verifier<'a, T> {
+        inner: AsyncVerifier<'a, T>,
         rt: tokio::runtime::Runtime,
     }
 
-    impl<'a> Verifier<'a> {
+    impl<'a, T> Verifier<'a, T> {
         /// Constructs a synchronous Sigstore verifier.
         ///
         /// For verifications against the public-good trust root, use [`Verifier::production()`].
-        pub fn new<R: TrustRoot>(
-            rekor_config: RekorConfiguration,
-            trust_repo: R,
-        ) -> SigstoreResult<Self> {
+        pub fn new<R: TrustRoot>(online_verifier: T, trust_repo: R) -> SigstoreResult<Self> {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()?;
-            let inner = AsyncVerifier::new(rekor_config, trust_repo)?;
+            let inner = AsyncVerifier::new(online_verifier, trust_repo)?;
 
             Ok(Self { rt, inner })
         }
@@ -317,10 +309,10 @@ pub mod blocking {
         }
     }
 
-    impl<'a> Verifier<'a> {
+    impl<'a> Verifier<'a, ()> {
         /// Constructs a synchronous [`Verifier`] against the public-good trust root.
         #[cfg(feature = "sigstore-trust-root")]
-        pub fn production() -> SigstoreResult<Verifier<'a>> {
+        pub fn production() -> SigstoreResult<Verifier<'a, ()>> {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()?;

@@ -29,6 +29,7 @@ use crate::errors::{Result, SigstoreError};
 /// The following checks are performed against the given certificate:
 /// * The certificate has the right set of key usages
 /// * The certificate cannot be used before the current time
+#[allow(dead_code)]
 pub(crate) fn is_trusted(certificate: &Certificate, integrated_time: i64) -> Result<()> {
     verify_key_usages(certificate)?;
     verify_has_san(certificate)?;

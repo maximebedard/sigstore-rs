@@ -157,7 +157,7 @@
 //! }
 //! ```
 //! # Rekor integration
-//! The examples folder contains code that shows users how to make Rekor API calls.  
+//! The examples folder contains code that shows users how to make Rekor API calls.
 //! It also provides a clean interface with step-by-step instructions that other developers can copy and paste.
 //!
 //! ```rust,no_run
@@ -279,7 +279,7 @@ pub mod oauth;
 #[cfg(feature = "registry")]
 pub mod registry;
 
-#[cfg(feature = "rekor")]
+#[cfg(any(feature = "rekor", feature = "rekor-models"))]
 pub mod rekor;
 
 #[cfg(any(feature = "sign", feature = "verify"))]

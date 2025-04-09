@@ -38,10 +38,11 @@ fulcio = ["oauth", "serde_with"]
 
 rekor-native-tls = ["reqwest/native-tls", "rekor"]
 rekor-rustls-tls = ["reqwest/rustls-tls", "rekor"]
-rekor = ["reqwest"]
+rekor = ["reqwest", "rekor-models"]
+rekor-models = []
 
 sign = ["sigstore_protobuf_specs", "fulcio", "rekor", "cert"]
-verify = ["sigstore_protobuf_specs", "rekor", "cert"]
+verify = ["sigstore_protobuf_specs", "rekor-models", "cert"]
 bundle = ["sign", "verify"]
 
 sigstore-trust-root = ["sigstore_protobuf_specs", "futures-util", "tough", "regex", "tokio/sync"]

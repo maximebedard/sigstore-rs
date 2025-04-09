@@ -25,6 +25,7 @@ use crate::errors::{Result as SigstoreResult, SigstoreError};
 #[derive(Default, Debug)]
 pub(crate) struct CertificatePool<'a> {
     trusted_roots: Vec<TrustAnchor<'a>>,
+    #[allow(dead_code)]
     intermediates: Vec<CertificateDer<'a>>,
 }
 
@@ -58,6 +59,7 @@ impl<'a> CertificatePool<'a> {
     /// Because of that the validity checks performed by this method are more
     /// relaxed. The validity checks are done inside of
     /// [`crate::crypto::verify_validity`] and [`crate::crypto::verify_expiration`].
+    #[allow(dead_code)]
     pub(crate) fn verify_pem_cert(
         &self,
         cert_pem: &[u8],
@@ -81,6 +83,7 @@ impl<'a> CertificatePool<'a> {
     /// Because of that the validity checks performed by this method are more
     /// relaxed. The validity checks are done inside of
     /// [`crate::crypto::verify_validity`] and [`crate::crypto::verify_expiration`].
+    #[allow(dead_code)]
     pub(crate) fn verify_der_cert(
         &self,
         der: &[u8],
@@ -98,6 +101,7 @@ impl<'a> CertificatePool<'a> {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn verify_cert_with_time<'cert>(
         &'a self,
         cert: &'cert EndEntityCert<'cert>,

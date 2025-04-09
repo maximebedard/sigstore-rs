@@ -86,6 +86,9 @@
 //!- search_log_query
 //!
 
+#[cfg(feature = "rekor")]
 pub mod apis;
+
+#[cfg(feature = "rekor-models")]
 pub mod models;
 type TreeSize = i64;
