@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 use base64::{engine::general_purpose::STANDARD as base64, Engine as _};
-use json_syntax::Print;
+use json_syntax::JsonPrint;
 
 use sigstore_protobuf_specs::dev::sigstore::{
     common::v1::LogId,
