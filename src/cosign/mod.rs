@@ -282,8 +282,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use pki_types::CertificateDer;
     use serde_json::json;
-    use webpki::types::CertificateDer;
 
     use super::constraint::{AnnotationMarker, PrivateKeySigner};
     use super::*;
