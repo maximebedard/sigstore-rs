@@ -31,7 +31,7 @@ use sigstore_protobuf_specs::dev::sigstore::{
 };
 use tough::TargetName;
 use tracing::debug;
-use webpki::types::CertificateDer;
+use rustls_pki_types::CertificateDer;
 
 mod constants;
 

@@ -19,7 +19,7 @@ use std::io::{self, Read};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tracing::debug;
-use webpki::types::{CertificateDer, UnixTime};
+use rustls_pki_types::{CertificateDer, UnixTime};
 use x509_cert::der::Encode;
 
 use crate::{

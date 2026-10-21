@@ -17,7 +17,7 @@
 
 use serde::Serialize;
 use std::cmp::Ordering;
-use webpki::types::CertificateDer;
+use rustls_pki_types::CertificateDer;
 
 use crate::errors;
 

@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use tracing::info;
-use webpki::types::CertificateDer;
+use rustls_pki_types::CertificateDer;
 
 use super::client::Client;
 use crate::crypto::SigningScheme;

@@ -283,7 +283,7 @@ where
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use webpki::types::CertificateDer;
+    use rustls_pki_types::CertificateDer;
 
     use super::constraint::{AnnotationMarker, PrivateKeySigner};
     use super::*;
