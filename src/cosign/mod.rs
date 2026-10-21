@@ -333,7 +333,7 @@ TNMea7Ix/stJ5TfcLLeABLE4BNJOsQ4vnBHJ
 -----END CERTIFICATE-----"#;
 
     #[cfg(feature = "test-registry")]
-    const SIGNED_IMAGE: &str = "busybox:1.34";
+    const SIGNED_IMAGE: &str = "busybox:1.36.1";
 
     pub(crate) fn get_fulcio_cert_pool() -> CertificatePool {
         fn pem_to_der<'a>(input: &'a str) -> CertificateDer<'a> {
@@ -643,12 +643,20 @@ TNMea7Ix/stJ5TfcLLeABLE4BNJOsQ4vnBHJ
 
     #[cfg(feature = "test-registry")]
     async fn prepare_image_to_be_signed(client: &mut Client, image_ref: &OciReference) {
-        let data = client
-            .registry_client
+        // The test image only ships linux variants, so don't resolve against the host platform.
+        let upstream_client =
+            oci_distribution::Client::new(oci_distribution::client::ClientConfig {
+                platform_resolver: Some(Box::new(oci_distribution::client::linux_amd64_resolver)),
+                ..Default::default()
+            });
+        let data = upstream_client
             .pull(
                 &SIGNED_IMAGE.parse().expect("failed to parse image ref"),
                 &oci_distribution::secrets::RegistryAuth::Anonymous,
-                vec![oci_distribution::manifest::IMAGE_DOCKER_LAYER_GZIP_MEDIA_TYPE],
+                vec![
+                    oci_distribution::manifest::IMAGE_DOCKER_LAYER_GZIP_MEDIA_TYPE,
+                    oci_distribution::manifest::IMAGE_LAYER_GZIP_MEDIA_TYPE,
+                ],
             )
             .await
             .expect("pull test image failed");

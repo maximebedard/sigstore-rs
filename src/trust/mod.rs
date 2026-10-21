@@ -20,7 +20,7 @@ pub mod sigstore;
 
 /// A `TrustRoot` owns all key material necessary for establishing a root of trust.
 pub trait TrustRoot {
-    fn fulcio_certs(&self) -> crate::errors::Result<Vec<CertificateDer>>;
+    fn fulcio_certs(&self) -> crate::errors::Result<Vec<CertificateDer<'_>>>;
     fn rekor_keys(&self) -> crate::errors::Result<Vec<&[u8]>>;
     fn ctfe_keys(&self) -> crate::errors::Result<Vec<&[u8]>>;
 }
@@ -35,7 +35,7 @@ pub struct ManualTrustRoot<'a> {
 }
 
 impl TrustRoot for ManualTrustRoot<'_> {
-    fn fulcio_certs(&self) -> crate::errors::Result<Vec<CertificateDer>> {
+    fn fulcio_certs(&self) -> crate::errors::Result<Vec<CertificateDer<'_>>> {
         Ok(match &self.fulcio_certs {
             Some(certs) => certs.clone(),
             None => Vec::new(),
